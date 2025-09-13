@@ -163,7 +163,7 @@ export default function LeadDetailPage() {
                             {renderQuestion('Budget massimo', lead.questionnaire1.maxBudget)}
                             {renderQuestion('Necessita mutuo', lead.questionnaire1.needsMortgage)}
                             {renderQuestion('Percentuale mutuo richiesta', lead.questionnaire1.mortgagePercentage ? `${lead.questionnaire1.mortgagePercentage}%` : undefined)}
-                            {renderQuestion('Pre-approvazione mutuo', lead.questionnaire1.preApproval)}
+                            {renderQuestion('Pre-approvazione mutuo', lead.questionnaire1.mortgagePreApproval)}
                             {renderQuestion('Tempistica di acquisto', lead.questionnaire1.purchaseTimeline)}
                         </ul>
                     </div>
