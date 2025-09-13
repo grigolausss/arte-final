@@ -13,7 +13,7 @@ const {
 } = require('../controllers/propertyController');
 const { protect } = require('../middleware/authMiddleware');
 const { protectEmployee } = require('../middleware/employeeAuthMiddleware');
-const upload = require('../middleware/uploadMiddleware');
+const upload = require('../middleware/cloudinaryUploadMiddleware');
 
 // === Public User Routes ===
 

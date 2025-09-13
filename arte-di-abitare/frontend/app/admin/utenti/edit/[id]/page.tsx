@@ -5,6 +5,8 @@ import EmployeeForm from '@/components/admin/EmployeeForm';
 import type { EmployeeData } from '@/components/admin/EmployeeForm';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 export default function EditUserPage() {
     const router = useRouter();
     const params = useParams();
@@ -22,7 +24,7 @@ export default function EditUserPage() {
             try {
                 const token = localStorage.getItem('employeeAuthToken');
                 if (!token) { router.push('/admin/login'); return; }
-                const res = await fetch(`/api/employees/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const res = await fetch(`${API_URL}/api/employees/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (!res.ok) throw new Error('Utente non trovato.');
                 const data = await res.json();
                 setEmployee(data);
@@ -43,7 +45,7 @@ export default function EditUserPage() {
             const { password, ...updateData } = data;
             const payload = password ? data : updateData;
 
-            const res = await fetch(`/api/employees/${id}`, {
+            const res = await fetch(`${API_URL}/api/employees/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(payload),

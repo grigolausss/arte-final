@@ -1,204 +1,157 @@
 const Lead = require('../models/leadModel');
 const Property = require('../models/propertyModel');
-const User = require('../models/userModel');
 const Employee = require('../models/employeeModel');
 const logActivity = require('../utils/logger');
 
-// ... (existing functions like submitQuestionnaire1, submitQuestionnaire2)
+const asyncHandler = fn => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
 
-const submitQuestionnaire1 = async (req, res) => {
+const submitQuestionnaire1 = asyncHandler(async (req, res, next) => {
     const { propertyRif, answers } = req.body;
     const userId = req.user._id;
-    try {
-        const property = await Property.findOne({ rif: propertyRif.toUpperCase() });
-        if (!property) return res.status(404).json({ message: 'Immobile non trovato.' });
-        const lead = await Lead.findOneAndUpdate(
-            { user: userId, property: property._id },
-            { $set: { user: userId, property: property._id, questionnaire1: answers, status: 'Nuovo' } },
-            { new: true, upsert: true, runValidators: true }
-        );
-        res.status(201).json({ message: 'Questionario inviato con successo.', lead });
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.', error: error.message });
-    }
-};
 
-const submitQuestionnaire2 = async (req, res) => {
+    const property = await Property.findOne({ rif: propertyRif.toUpperCase() });
+    if (!property) {
+        res.status(404);
+        throw new Error('Immobile non trovato.');
+    }
+
+    const lead = await Lead.findOneAndUpdate(
+        { user: userId, property: property._id },
+        { $set: { user: userId, property: property._id, questionnaire1: answers, status: 'Incompleto' } },
+        { new: true, upsert: true, runValidators: true }
+    );
+
+    res.status(201).json({ message: 'Questionario 1 inviato con successo.', lead });
+});
+
+const submitQuestionnaire2 = asyncHandler(async (req, res, next) => {
     const { propertyRif, answers } = req.body;
     const userId = req.user._id;
-    try {
-        const property = await Property.findOne({ rif: propertyRif.toUpperCase() });
-        if (!property) return res.status(404).json({ message: 'Immobile non trovato.' });
-        const lead = await Lead.findOne({ user: userId, property: property._id });
-        if (!lead) return res.status(404).json({ message: 'Lead non trovato. Completa prima il questionario 1.' });
-        lead.questionnaire2 = answers;
-        const updatedLead = await lead.save();
-        res.status(200).json({ message: 'Questionario 2 inviato con successo.', lead: updatedLead });
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.', error: error.message });
+
+    const property = await Property.findOne({ rif: propertyRif.toUpperCase() });
+    if (!property) {
+        res.status(404);
+        throw new Error('Immobile non trovato.');
     }
-};
 
-// --- New User Decision Tracking Functions ---
-
-const savePropertyDecision = async (req, res) => {
-    const { choice } = req.body; // 'interessato' or 'non interessato'
-    const { rif } = req.params;
-    const userId = req.user._id;
-    try {
-        const property = await Property.findOne({ rif: rif.toUpperCase() });
-        if (!property) return res.status(404).json({ message: 'Immobile non trovato.' });
-        const lead = await Lead.findOne({ user: userId, property: property._id });
-        if (!lead) return res.status(404).json({ message: 'Lead non trovato.' });
-
-        lead.decisionPropertyInterest = choice;
-        await lead.save();
-        res.status(200).json({ message: 'Decisione salvata.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.' });
+    const lead = await Lead.findOne({ user: userId, property: property._id });
+    if (!lead) {
+        res.status(404);
+        throw new Error('Lead non trovato. Completa prima il questionario 1.');
     }
-};
 
-const saveZoneDecision = async (req, res) => {
-    const { choice } = req.body; // 'zona va bene' or 'zona non va bene'
-    const { rif } = req.params;
-    const userId = req.user._id;
-    try {
-        const property = await Property.findOne({ rif: rif.toUpperCase() });
-        if (!property) return res.status(404).json({ message: 'Immobile non trovato.' });
-        const lead = await Lead.findOne({ user: userId, property: property._id });
-        if (!lead) return res.status(404).json({ message: 'Lead non trovato.' });
+    lead.questionnaire2 = answers;
 
-        lead.decisionZoneInterest = choice;
-        await lead.save();
-        res.status(200).json({ message: 'Decisione sulla zona salvata.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.' });
+    // Logica di categorizzazione lead (Punto G)
+    const q1 = lead.questionnaire1 || {};
+    const q2 = answers || {};
+
+    const isImmobileOk = q1.propertyInterest === 'si';
+    const isPlanimetryOk = q1.planimetryInterest === 'si';
+    const isZoneOk = q1.zoneInterest === 'si';
+    const isUserInterested = q2.finalInterest === 'si';
+    const purchaseTimeframe = q2.purchaseTimeframe; // es. 'Entro 3 mesi'
+
+    const allPositive = isImmobileOk && isPlanimetryOk && isZoneOk && isUserInterested;
+    const isUrgent = purchaseTimeframe === 'Entro 3 mesi' || purchaseTimeframe === 'Entro 1 mese';
+
+    if (allPositive && isUrgent) {
+        lead.status = 'Da richiamare subito';
+    } else {
+        lead.status = 'Da richiamare';
     }
-};
+
+    const updatedLead = await lead.save();
+    res.status(200).json({ message: 'Questionario 2 inviato con successo.', lead: updatedLead });
+});
+
+const getLeadsByStatus = (status, sort = { createdAt: -1 }) => asyncHandler(async (req, res, next) => {
+    const leads = await Lead.find({ status })
+        .populate('user', 'name surname email phone')
+        .populate('property', 'title rif')
+        .sort(sort);
+    res.status(200).json(leads);
+});
+
+const getHotLeads = getLeadsByStatus('Da richiamare subito', { updatedAt: -1 });
+const getWarmLeads = getLeadsByStatus('Da richiamare', { updatedAt: -1 });
+const getIncompleteLeads = getLeadsByStatus('Incompleto', { createdAt: -1 });
+const getArchivedLeads = getLeadsByStatus('Archiviato', { updatedAt: -1 });
 
 
-// ... (rest of the existing controller functions: getHotLeads, getWarmLeads, etc.)
+const getTodaysReminders = asyncHandler(async (req, res, next) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-const getHotLeads = async (req, res) => {
-    try {
-        const leads = await Lead.find({
-            status: 'Da richiamare',
-            callbackDate: { $lt: new Date() }
-        }).populate('user', 'name surname email phone').populate('property', 'title rif').sort({ callbackDate: 1 });
-        res.status(200).json(leads);
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.' });
+    const reminders = await Lead.find({
+        needsCallback: true,
+        callbackDate: { $gte: today, $lt: tomorrow }
+    }).populate('user', 'name surname');
+    res.status(200).json(reminders);
+});
+
+const getLeadById = asyncHandler(async (req, res, next) => {
+    const lead = await Lead.findById(req.params.id)
+        .populate('user', 'name surname email phone')
+        .populate('property', '_id title rif')
+        .populate('calledBy', 'email')
+        .populate({ path: 'notes', populate: { path: 'employee', select: 'email' } });
+
+    if (!lead) {
+        res.status(404);
+        throw new Error('Lead non trovato.');
     }
-};
+    res.status(200).json(lead);
+});
 
-const getWarmLeads = async (req, res) => {
-    try {
-        const leads = await Lead.find({
-            status: 'Da richiamare',
-            $or: [{ callbackDate: { $gte: new Date() } }, { callbackDate: { $exists: false } }]
-        }).populate('user', 'name surname email phone').populate('property', 'title rif').sort({ callbackDate: 1 });
-        res.status(200).json(leads);
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.' });
-    }
-};
-
-const getIncompleteLeads = async (req, res) => {
-    try {
-        const leads = await Lead.find({
-            status: { $nin: ['Da richiamare', 'Cliente', 'Archiviato'] }
-        }).populate('user', 'name surname email phone').populate('property', 'title rif').sort({ createdAt: -1 });
-        res.status(200).json(leads);
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.' });
-    }
-};
-
-const getTodaysReminders = async (req, res) => {
-    try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const reminders = await Lead.find({
-            needsCallback: true,
-            callbackDate: { $gte: today, $lt: tomorrow }
-        }).populate('user', 'name surname');
-        res.status(200).json(reminders);
-    } catch (error) {
-        res.status(500).json({ message: 'Errore nel recupero dei promemoria.' });
-    }
-};
-
-const getLeadById = async (req, res) => {
-    try {
-        const lead = await Lead.findById(req.params.id)
-            .populate('user', 'name surname email phone')
-            .populate('property', '_id title rif')
-            .populate('calledBy', 'email')
-            .populate({ path: 'notes', populate: { path: 'employee', select: 'email' } });
-        if (lead) { res.status(200).json(lead); }
-        else { res.status(404).json({ message: 'Lead non trovato.' }); }
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.' });
-    }
-};
-
-const updateLeadCallDetails = async (req, res) => {
+const updateLeadCallDetails = asyncHandler(async (req, res, next) => {
     const { id } = req.params;
-    const { isContacted, calledByEmail, callDate, noteText, needsCallback, callbackDate } = req.body;
+    const { isContacted, noteText, needsCallback, callbackDate, status } = req.body;
     const currentEmployeeId = req.employee._id;
-    try {
-        const lead = await Lead.findById(id);
-        if (!lead) { return res.status(404).json({ message: 'Lead non trovato.' }); }
-        if (noteText && noteText.trim() !== '') {
-            lead.notes.push({ text: noteText, employee: currentEmployeeId });
-        }
-        lead.isContacted = isContacted;
-        lead.needsCallback = needsCallback;
-        lead.callDate = isContacted && callDate ? callDate : null;
-        lead.callbackDate = needsCallback && callbackDate ? callbackDate : null;
-        if (isContacted && calledByEmail) {
-            const calledByEmployee = await Employee.findOne({ email: calledByEmail });
-            lead.calledBy = calledByEmployee ? calledByEmployee._id : null;
-        } else if (!isContacted) {
-            lead.calledBy = null;
-        }
-        // Update status based on the new logic
-        if (isContacted && !needsCallback) {
-            lead.status = 'Archiviato';
-        } else if (needsCallback) {
-            lead.status = 'Da richiamare';
-        } else if (isContacted) {
-            lead.status = 'Contattato';
-        }
-        const updatedLead = await lead.save();
-        await updatedLead.populate([
-            { path: 'user', select: 'name surname email phone' },
-            { path: 'property', select: '_id title rif' },
-            { path: 'calledBy', select: 'email' },
-            { path: 'notes', populate: { path: 'employee', select: 'email' } }
-        ]);
-        logActivity(currentEmployeeId, 'UPDATE_LEAD_DETAILS', `Aggiornati dettagli chiamata per lead ID: ${lead._id}`);
-        res.status(200).json(updatedLead);
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server durante l\'aggiornamento.', error: error.message });
+
+    const lead = await Lead.findById(id);
+    if (!lead) {
+        res.status(404);
+        throw new Error('Lead non trovato.');
     }
-};
+
+    if (noteText && noteText.trim() !== '') {
+        lead.notes.push({ text: noteText, employee: currentEmployeeId });
+    }
+
+    lead.isContacted = isContacted;
+    lead.needsCallback = needsCallback;
+    lead.callDate = isContacted ? (lead.callDate || Date.now()) : null;
+    lead.callbackDate = needsCallback ? callbackDate : null;
+
+    // Lo status viene gestito separatamente o aggiornato qui
+    if (status) {
+        lead.status = status;
+    } else if (isContacted && !needsCallback) {
+        lead.status = 'Archiviato';
+    }
+
+    const updatedLead = await lead.save();
+
+    await updatedLead.populate([
+        { path: 'user', select: 'name surname email phone' },
+        { path: 'property', select: '_id title rif' },
+        { path: 'calledBy', select: 'email' },
+        { path: 'notes', populate: { path: 'employee', select: 'email' } }
+    ]);
+
+    logActivity(currentEmployeeId, 'UPDATE_LEAD_DETAILS', `Aggiornati dettagli chiamata per lead ID: ${lead._id}`);
+    res.status(200).json(updatedLead);
+});
 
 
-const getArchivedLeads = async (req, res) => {
-    try {
-        const leads = await Lead.find({ status: 'Archiviato' })
-            .populate('user', 'name surname email phone')
-            .populate('property', 'title rif')
-            .sort({ updatedAt: -1 }); // Sort by when they were last updated (archived)
-        res.status(200).json(leads);
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.' });
-    }
-};
+// Deprecated decision functions, logic is now in questionnaire
+const savePropertyDecision = asyncHandler(async (req, res) => res.status(200).json({ message: 'Funzione deprecata.'}));
+const saveZoneDecision = asyncHandler(async (req, res) => res.status(200).json({ message: 'Funzione deprecata.'}));
+
 
 module.exports = {
     submitQuestionnaire1,

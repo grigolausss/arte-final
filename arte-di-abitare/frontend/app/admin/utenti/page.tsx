@@ -9,7 +9,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 interface Employee {
   _id: string;
   email: string;
-  role: string;
   createdAt: string;
 }
 
@@ -72,7 +71,6 @@ export default function UserListPage() {
           <thead>
             <tr className="border-b">
               <th className="p-4">Email</th>
-              <th className="p-4">Ruolo</th>
               <th className="p-4">Data Creazione</th>
               <th className="p-4">Azioni</th>
             </tr>
@@ -81,7 +79,6 @@ export default function UserListPage() {
             {employees.map(emp => (
               <tr key={emp._id} className="border-b hover:bg-gray-50">
                 <td className="p-4">{emp.email}</td>
-                <td className="p-4">{emp.role}</td>
                 <td className="p-4">{new Date(emp.createdAt).toLocaleDateString('it-IT')}</td>
                 <td className="p-4">
                   <Link href={`/admin/utenti/edit/${emp._id}`} className="text-blue-600 hover:underline font-semibold">

@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 export default function AddressPage() {
   const params = useParams();
   const router = useRouter();
@@ -22,7 +24,7 @@ export default function AddressPage() {
         const token = localStorage.getItem('authToken');
         if (!token) throw new Error('Autenticazione richiesta.');
 
-        const response = await fetch('/api/leads/final-step', {
+        const response = await fetch(`${API_URL}/api/leads/final-step`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({ propertyRif: rif, choice: 'discoverAddress' }),
@@ -58,10 +60,10 @@ export default function AddressPage() {
         if (!token) throw new Error('Autenticazione richiesta.');
 
         // This API call is just to save the phone number
-        await fetch('/api/leads/final-step', {
+        await fetch(`${API_URL}/api/users/update-phone`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ propertyRif: rif, choice: 'discoverAddress', phone }),
+            body: JSON.stringify({ phone, rif }),
         });
 
         setStep('thankYou');

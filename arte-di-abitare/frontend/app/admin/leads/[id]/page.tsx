@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 // Updated interfaces to match the new backend model
 interface Questionnaire1 {
     sellToBuy: string;
@@ -80,7 +82,7 @@ export default function LeadDetailPage() {
             try {
                 const token = localStorage.getItem('employeeAuthToken');
                 if (!token) { router.push('/admin/login'); return; }
-                const res = await fetch(`/api/leads/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const res = await fetch(`${API_URL}/api/leads/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (!res.ok) throw new Error('Lead non trovato.');
                 const data: LeadDetails = await res.json();
                 setLead(data);
@@ -111,7 +113,7 @@ export default function LeadDetailPage() {
         try {
             const token = localStorage.getItem('employeeAuthToken');
             if (!token) { router.push('/admin/login'); return; }
-            const res = await fetch(`/api/leads/${id}/call-details`, {
+            const res = await fetch(`${API_URL}/api/leads/${id}/call-details`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(callManager),
@@ -161,7 +163,7 @@ export default function LeadDetailPage() {
                             {renderQuestion('Budget massimo', lead.questionnaire1.maxBudget)}
                             {renderQuestion('Necessita mutuo', lead.questionnaire1.needsMortgage)}
                             {renderQuestion('Percentuale mutuo richiesta', lead.questionnaire1.mortgagePercentage ? `${lead.questionnaire1.mortgagePercentage}%` : undefined)}
-                            {renderQuestion('Pre-approvazione mutuo', lead.questionnaire1.mortgagePreApproval)}
+                            {renderQuestion('Pre-approvazione mutuo', lead.questionnaire1.preApproval)}
                             {renderQuestion('Tempistica di acquisto', lead.questionnaire1.purchaseTimeline)}
                         </ul>
                     </div>

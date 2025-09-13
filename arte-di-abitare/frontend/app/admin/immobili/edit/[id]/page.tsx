@@ -4,6 +4,8 @@ import { useRouter, useParams } from 'next/navigation';
 import PropertyForm from '@/components/admin/PropertyForm';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 // The PropertyData interface from the form is not directly used here anymore
 // since handleSubmit receives FormData.
 
@@ -26,7 +28,7 @@ export default function EditPropertyPage() {
                 const token = localStorage.getItem('employeeAuthToken');
                 if (!token) { router.push('/admin/login'); return; }
 
-                const res = await fetch(`/api/properties/${id}`, {
+                const res = await fetch(`${API_URL}/api/properties/${id}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -52,7 +54,7 @@ export default function EditPropertyPage() {
             if (!token) { router.push('/admin/login'); return; }
 
             // When sending FormData, the browser sets the Content-Type header automatically.
-            const res = await fetch(`/api/properties/${id}`, {
+            const res = await fetch(`${API_URL}/api/properties/${id}`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: data, // Pass FormData directly

@@ -43,7 +43,7 @@ export default function Home() {
     <div className="min-h-screen bg-blue-50 text-gray-800 flex flex-col">
       <header className="flex justify-end p-4">
         <Link href="/admin/login" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors">
-          Area Dipendenti
+          Area Riservata
         </Link>
       </header>
       <main className="flex-grow flex items-center justify-center p-4">

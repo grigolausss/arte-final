@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 interface AlternativeProperty {
   _id: string;
   rif: string;
@@ -28,7 +30,7 @@ export default function AlternativesPage() {
                 if (!token) { router.push('/'); return; }
 
                 // This is a new, dedicated endpoint for fetching alternatives
-                const response = await fetch(`/api/properties/${rif}/alternatives`, {
+                const response = await fetch(`${API_URL}/api/properties/${rif}/alternatives`, {
                     headers: { 'Authorization': `Bearer ${token}` },
                 });
 

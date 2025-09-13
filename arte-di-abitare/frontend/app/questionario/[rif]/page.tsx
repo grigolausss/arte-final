@@ -119,7 +119,7 @@ export default function NewQuestionnairePage() {
                         </div>
                     </fieldset>
                     {/* Q5 */}
-                    <fieldset><legend className="text-lg font-semibold mb-3">Quando prevedi di acquistare?</legend>
+                    <fieldset><legend className="text-lg font-semibold mb-3">Entro quando vuoi acquistare?</legend>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <ChoiceButton text="Entro 3 mesi" onClick={() => handleAnswerChange('purchaseTimeline', 'entro 3 mesi')} isSelected={answers.purchaseTimeline === 'entro 3 mesi'} />
                             <ChoiceButton text="Entro 6 mesi" onClick={() => handleAnswerChange('purchaseTimeline', 'entro 6 mesi')} isSelected={answers.purchaseTimeline === 'entro 6 mesi'} />

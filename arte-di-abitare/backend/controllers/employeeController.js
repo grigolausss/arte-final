@@ -1,8 +1,11 @@
 const crypto = require('crypto');
 const Employee = require('../models/employeeModel');
-const { sendEmail, generateOtpEmailHtml } = require('../utils/sendEmail');
+const { sendEmail } = require('../utils/sendEmail');
 const jwt = require('jsonwebtoken');
 const logActivity = require('../utils/logger');
+
+const asyncHandler = fn => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
 
 // --- Helper Functions ---
 const generateEmployeeToken = (id) => {
@@ -29,167 +32,144 @@ const generateResetPasswordEmailHtml = (name, resetUrl) => {
 
 // --- Controller Functions ---
 
-const loginEmployee = async (req, res) => {
+const loginEmployee = asyncHandler(async (req, res, next) => {
     const { email, password } = req.body;
-    try {
-        const employee = await Employee.findOne({ email });
-        if (employee && (await employee.matchPassword(password))) {
-            const otp = Math.floor(100000 + Math.random() * 900000).toString();
-            employee.otp = otp;
-            employee.otpExpires = new Date(new Date().getTime() + 10 * 60 * 1000);
-            await employee.save();
-            const textContent = `Il tuo codice OTP per l'accesso all'area riservata è: ${otp}`;
-            const htmlContent = generateOtpEmailHtml(employee.email, otp);
-            await sendEmail({
-                email: employee.email,
-                subject: 'Codice di Accesso Area Riservata - Arte di Abitare',
-                message: textContent,
-                htmlContent: htmlContent,
-            });
-            return res.status(200).json({ message: `Accesso autorizzato. Ti abbiamo inviato un codice OTP via email.` });
-        }
-        res.status(401).json({ message: 'Email o password non valide.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.' });
-    }
-};
+    const employee = await Employee.findOne({ email });
 
-const verifyEmployeeOtp = async (req, res) => {
-    const { email, otp } = req.body;
-    try {
-        const employee = await Employee.findOne({ email });
-        if (!employee || !employee.otp || employee.otp !== otp || employee.otpExpires < new Date()) {
-            return res.status(400).json({ message: 'OTP non valido o scaduto.' });
-        }
-        employee.otp = undefined;
-        employee.otpExpires = undefined;
-        await employee.save();
+    if (employee && (await employee.matchPassword(password))) {
         logActivity(employee._id, 'EMPLOYEE_LOGIN', `L'impiegato ${employee.email} ha effettuato il login.`);
+
         res.status(200).json({
             message: 'Login effettuato con successo.',
             token: generateEmployeeToken(employee._id),
             employee: { _id: employee._id, email: employee.email },
         });
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.' });
+    } else {
+        res.status(401);
+        throw new Error('Email o password non valide.');
     }
-};
+});
 
-const forgotPassword = async (req, res) => {
+const forgotPassword = asyncHandler(async (req, res, next) => {
     const { email } = req.body;
-    try {
-        const employee = await Employee.findOne({ email });
-        if (!employee) {
-            return res.status(200).json({ message: 'Se l\'email è registrata, riceverai un link per il reset.' });
-        }
+    const employee = await Employee.findOne({ email });
+
+    // Rispondiamo sempre positivamente per non rivelare se un'email esiste
+    if (employee) {
         const resetToken = employee.getResetPasswordToken();
         await employee.save({ validateBeforeSave: false });
-        const resetUrl = `http://localhost:3000/admin/reset-password/${resetToken}`;
+
+        // NOTA: L'URL del frontend dovrebbe provenire da una variabile d'ambiente
+        const resetUrl = `${process.env.FRONTEND_URL}/admin/reset-password/${resetToken}`;
         const textContent = `Hai richiesto un reset della password...`;
         const htmlContent = generateResetPasswordEmailHtml(employee.email, resetUrl);
-        await sendEmail({
-            email: employee.email,
-            subject: 'Reset della Password - Arte di Abitare',
-            message: textContent,
-            htmlContent: htmlContent,
-        });
-        res.status(200).json({ message: 'Email per il reset della password inviata.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Errore durante l\'invio dell\'email.' });
-    }
-};
 
-const resetPassword = async (req, res) => {
+        try {
+            await sendEmail({
+                email: employee.email,
+                subject: 'Reset della Password - Arte di Abitare',
+                message: textContent,
+                htmlContent: htmlContent,
+            });
+        } catch (error) {
+            console.error("Failed to send password reset email:", error);
+            // Non lanciare un errore al client per motivi di sicurezza
+        }
+    }
+
+    res.status(200).json({ message: 'Se l\'email è registrata, riceverai un link per il reset.' });
+});
+
+const resetPassword = asyncHandler(async (req, res, next) => {
     const resetPasswordToken = crypto.createHash('sha256').update(req.params.resettoken).digest('hex');
-    try {
-        const employee = await Employee.findOne({ resetPasswordToken, resetPasswordExpire: { $gt: Date.now() } });
-        if (!employee) {
-            return res.status(400).json({ message: 'Token non valido o scaduto.' });
-        }
-        employee.password = req.body.password;
-        employee.resetPasswordToken = undefined;
-        employee.resetPasswordExpire = undefined;
-        await employee.save();
-        res.status(200).json({ message: 'Password resettata con successo.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.' });
-    }
-};
 
-const createEmployee = async (req, res) => {
+    const employee = await Employee.findOne({
+        resetPasswordToken,
+        resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!employee) {
+        res.status(400);
+        throw new Error('Token non valido o scaduto.');
+    }
+
+    employee.password = req.body.password;
+    employee.resetPasswordToken = undefined;
+    employee.resetPasswordExpire = undefined;
+    await employee.save();
+
+    res.status(200).json({ message: 'Password resettata con successo.' });
+});
+
+const createEmployee = asyncHandler(async (req, res, next) => {
     const { email, password } = req.body;
-    try {
-        const employeeExists = await Employee.findOne({ email });
-        if (employeeExists) {
-            return res.status(400).json({ message: 'Un dipendente con questa email esiste già.' });
-        }
-        const employee = await Employee.create({ email, password });
-        logActivity(req.employee._id, 'CREATE_EMPLOYEE', `Creato nuovo impiegato: ${employee.email}`);
-        res.status(201).json({ _id: employee._id, email: employee.email });
-    } catch (error) {
-        res.status(400).json({ message: 'Dati non validi.', error: error.message });
-    }
-};
 
-const getEmployees = async (req, res) => {
+    const employeeExists = await Employee.findOne({ email });
+    if (employeeExists) {
+        res.status(400);
+        throw new Error('Un dipendente con questa email esiste già.');
+    }
+
+    const employee = await Employee.create({ email, password });
+    logActivity(req.employee._id, 'CREATE_EMPLOYEE', `Creato nuovo impiegato: ${employee.email}`);
+    res.status(201).json({ _id: employee._id, email: employee.email });
+});
+
+const getEmployees = asyncHandler(async (req, res, next) => {
     const employees = await Employee.find({}).select('-password');
     res.json(employees);
-};
+});
 
-const getEmployeeById = async (req, res) => {
+const getEmployeeById = asyncHandler(async (req, res, next) => {
     const employee = await Employee.findById(req.params.id).select('-password');
-    if (employee) {
-        res.json(employee);
-    } else {
-        res.status(404).json({ message: 'Dipendente non trovato.' });
+    if (!employee) {
+        res.status(404);
+        throw new Error('Dipendente non trovato.');
     }
-};
+    res.json(employee);
+});
 
-const updateEmployee = async (req, res) => {
+const updateEmployee = asyncHandler(async (req, res, next) => {
     const employee = await Employee.findById(req.params.id);
-    if (employee) {
-        employee.email = req.body.email || employee.email;
-        if (req.body.password) {
-            employee.password = req.body.password;
-        }
-        const updatedEmployee = await employee.save();
-        logActivity(req.employee._id, 'UPDATE_EMPLOYEE', `Aggiornato impiegato: ${updatedEmployee.email}`);
-        res.json({ _id: updatedEmployee._id, email: updatedEmployee.email });
-    } else {
-        res.status(404).json({ message: 'Dipendente non trovato.' });
+    if (!employee) {
+        res.status(404);
+        throw new Error('Dipendente non trovato.');
     }
-};
 
-const deleteEmployee = async (req, res) => {
+    employee.email = req.body.email || employee.email;
+    if (req.body.password) {
+        employee.password = req.body.password;
+    }
+
+    const updatedEmployee = await employee.save();
+    logActivity(req.employee._id, 'UPDATE_EMPLOYEE', `Aggiornato impiegato: ${updatedEmployee.email}`);
+    res.json({ _id: updatedEmployee._id, email: updatedEmployee.email });
+});
+
+const deleteEmployee = asyncHandler(async (req, res, next) => {
     const employee = await Employee.findById(req.params.id);
-    if (employee) {
-        if (req.employee._id.equals(employee._id)) {
-            return res.status(400).json({ message: 'Non puoi eliminare il tuo account.' });
-        }
-        await employee.deleteOne();
-        logActivity(req.employee._id, 'DELETE_EMPLOYEE', `Rimosso impiegato: ${employee.email}`);
-        res.json({ message: 'Dipendente rimosso.' });
-    } else {
-        res.status(404).json({ message: 'Dipendente non trovato.' });
+    if (!employee) {
+        res.status(404);
+        throw new Error('Dipendente non trovato.');
     }
-};
 
-const updateMyPassword = async (req, res) => {
-    const employee = await Employee.findById(req.employee._id);
-    if (employee) {
-        if (req.body.password) {
-            employee.password = req.body.password;
-            await employee.save();
-            res.json({ message: 'Password aggiornata con successo.' });
-        } else {
-            res.status(400).json({ message: 'Per favore, fornisci una nuova password.' });
-        }
-    } else {
-        res.status(404).json({ message: 'Dipendente non trovato.' });
+    if (req.employee._id.equals(employee._id)) {
+        res.status(400);
+        throw new Error('Non puoi eliminare il tuo account.');
     }
-};
+
+    await employee.deleteOne();
+    logActivity(req.employee._id, 'DELETE_EMPLOYEE', `Rimosso impiegato: ${employee.email}`);
+    res.json({ message: 'Dipendente rimosso.' });
+});
 
 module.exports = {
-    loginEmployee, verifyEmployeeOtp, forgotPassword, resetPassword, createEmployee,
-    getEmployees, getEmployeeById, updateEmployee, deleteEmployee, updateMyPassword,
+    loginEmployee,
+    forgotPassword,
+    resetPassword,
+    createEmployee,
+    getEmployees,
+    getEmployeeById,
+    updateEmployee,
+    deleteEmployee,
 };

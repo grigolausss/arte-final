@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 interface ZoneData {
-  zoneImage: string; // just the filename
+  zoneImage: string;
   title: string;
 }
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function ZonePage() {
     const params = useParams();
@@ -18,8 +20,6 @@ export default function ZonePage() {
     const [error, setError] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
     useEffect(() => {
         if (!rif) return;
         const fetchZoneImage = async () => {
@@ -27,7 +27,7 @@ export default function ZonePage() {
             try {
                 const token = localStorage.getItem('authToken');
                 if (!token) { router.push('/'); return; }
-                const response = await fetch(`/api/properties/${rif}/zone`, {
+                const response = await fetch(`${API_URL}/api/properties/${rif}/zone`, {
                     headers: { 'Authorization': `Bearer ${token}` },
                 });
                 if (!response.ok) throw new Error((await response.json()).message || 'Dati della zona non trovati.');
@@ -48,11 +48,15 @@ export default function ZonePage() {
         try {
             const token = localStorage.getItem('authToken');
             if (!token) throw new Error('Autenticazione richiesta.');
-            await fetch(`/api/leads/${rif}/decision-zone`, {
+
+            // This endpoint is now deprecated and logic is in questionnaire
+            // We'll leave the call here in case it's used for tracking, but it can be removed
+            await fetch(`${API_URL}/api/leads/${rif}/decision-zone`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ choice }),
             });
+
             if (choice === 'zona va bene') {
                 router.push(`/ringraziamento/${rif}?source=zona-ok`);
             } else {
@@ -75,7 +79,7 @@ export default function ZonePage() {
                 <p className="text-lg text-gray-600 mt-2 mb-6">Ecco la zona dell'immobile: {zoneData.title}</p>
                 <div className="mb-8 border rounded-lg">
                     <img
-                        src={`${API_BASE_URL}/uploads/${zoneData.zoneImage}`}
+                        src={zoneData.zoneImage}
                         alt={`Zona per ${zoneData.title}`}
                         className="rounded-lg w-full h-auto"
                     />

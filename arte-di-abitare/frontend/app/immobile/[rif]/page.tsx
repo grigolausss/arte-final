@@ -8,9 +8,11 @@ interface Property {
   _id: string;
   title: string;
   rif: string;
-  dossierImage: string; // Now just the filename
+  dossierImage: string;
   questionnairesCompleted: boolean;
 }
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function PropertyDossierPage() {
   const params = useParams();
@@ -20,8 +22,6 @@ export default function PropertyDossierPage() {
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   useEffect(() => {
     if (!rif) return;
@@ -49,7 +49,7 @@ export default function PropertyDossierPage() {
   if (!property) return <div className="flex justify-center items-center min-h-screen"><p>Immobile non trovato.</p></div>;
 
   const nextStepLink = property.questionnairesCompleted ? `/planimetria/${rif}` : `/questionario/${rif}`;
-  const buttonText = property.questionnairesCompleted ? 'Visualizza la planimetria' : 'Inizia il questionario';
+  const buttonText = property.questionnairesCompleted ? 'Visualizza la planimetria' : 'Continua';
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
@@ -58,7 +58,7 @@ export default function PropertyDossierPage() {
         <p className="text-lg text-gray-500 mb-6">RIF: {property.rif}</p>
         <div className="mb-8 border rounded-lg">
             <img
-                src={`${API_URL}/uploads/${property.dossierImage}`}
+                src={property.dossierImage}
                 alt={`Dossier per ${property.title}`}
                 className="rounded-lg w-full h-auto"
             />

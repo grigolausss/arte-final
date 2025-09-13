@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 export default function ResetPasswordPage() {
     const router = useRouter();
     const params = useParams();
@@ -28,7 +30,7 @@ export default function ResetPasswordPage() {
         setIsLoading(true);
 
         try {
-            const res = await fetch(`/api/employees/reset-password/${token}`, {
+            const res = await fetch(`${API_URL}/api/employees/reset-password/${token}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ password }),

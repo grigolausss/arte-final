@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 export default function PlanimetryPage() {
   const params = useParams();
   const router = useRouter();
@@ -26,7 +28,7 @@ export default function PlanimetryPage() {
         const token = localStorage.getItem('authToken');
         if (!token) throw new Error('Autenticazione richiesta. Per favore, torna alla homepage e riverifica la tua email.');
 
-        const response = await fetch(`/api/properties/${rif}/planimetria`, {
+        const response = await fetch(`${API_URL}/api/properties/${rif}/planimetria`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
 

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 export default function DecisionPage() {
     const params = useParams();
     const router = useRouter();
@@ -18,7 +20,9 @@ export default function DecisionPage() {
             const token = localStorage.getItem('authToken');
             if (!token) throw new Error('Autenticazione richiesta.');
 
-            await fetch(`/api/leads/${rif}/decision-property`, {
+            // This endpoint is now deprecated and logic is in questionnaire
+            // We'll leave the call here in case it's used for tracking, but it can be removed
+            await fetch(`${API_URL}/api/leads/${rif}/decision-property`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ choice }),
