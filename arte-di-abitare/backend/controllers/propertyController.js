@@ -63,7 +63,22 @@ const getWatermarkedFloorPlan = asyncHandler(async (req, res, next) => {
     const userEmail = req.user.email;
     const currentDate = new Date().toLocaleString('it-IT', { timeZone: 'Europe/Rome' });
     const watermarkText = `${userEmail}   ${currentDate}`;
-    const svgWatermark = `<svg width="950" height="150"><text x="30" y="90" font-family="Arial, sans-serif" font-weight="bold" font-size="48" fill="rgba(0, 0, 0, 0.25)" transform="rotate(-30)">${watermarkText}</text></svg>`;
+
+    // Using a smaller, more generic SVG for tiling to avoid dimension errors
+    const svgWatermark = `
+    <svg width="400" height="200" xmlns="http://www.w3.org/2000/svg">
+      <text
+        x="50"
+        y="100"
+        font-family="Arial, sans-serif"
+        font-weight="bold"
+        font-size="20"
+        fill="rgba(0, 0, 0, 0.15)"
+        transform="rotate(-30, 50, 100)"
+      >
+        ${watermarkText}
+      </text>
+    </svg>`;
     const svgBuffer = Buffer.from(svgWatermark);
 
     const watermarkedImageBuffer = await sharp(imageBuffer)
@@ -131,6 +146,7 @@ const updateProperty = asyncHandler(async (req, res, next) => {
     }
 
     // Aggiorna gli altri campi
+    delete req.body._id; // Evita di sovrascrivere l'_id, che causava il crash
     Object.assign(property, req.body);
     property.isActive = req.body.isActive === 'true';
 

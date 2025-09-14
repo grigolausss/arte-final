@@ -29,6 +29,10 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
+// --- Static Folder ---
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
+
 // --- Static and API Routes ---
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/properties', require('./routes/propertyRoutes'));
