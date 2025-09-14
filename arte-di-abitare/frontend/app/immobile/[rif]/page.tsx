@@ -38,6 +38,8 @@ export default function PropertyDossierPage() {
         if (!response.ok) throw new Error((await response.json()).message || 'Dettagli immobile non trovati.');
         const data: Property = await response.json();
         setProperty(data);
+        // Store completion status for the next step (planimetry page)
+        localStorage.setItem('questionnairesCompleted', JSON.stringify(data.questionnairesCompleted));
       } catch (err: any) { setError(err.message); }
       finally { setLoading(false); }
     };

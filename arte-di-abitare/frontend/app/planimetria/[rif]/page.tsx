@@ -15,8 +15,13 @@ export default function PlanimetryPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [questionnairesCompleted, setQuestionnairesCompleted] = useState(false);
 
   useEffect(() => {
+    // On component mount, check the questionnaire completion status from localStorage
+    const completed = localStorage.getItem('questionnairesCompleted') === 'true';
+    setQuestionnairesCompleted(completed);
+
     if (!rif) return;
 
     let objectUrl: string;
@@ -60,6 +65,8 @@ export default function PlanimetryPage() {
   if (loading) return <div className="flex justify-center items-center min-h-screen bg-gray-100"><p className="text-xl">Caricamento planimetria con watermark...</p></div>;
   if (error) return <div className="flex justify-center items-center min-h-screen bg-gray-100"><p className="text-red-600 text-xl text-center p-4">{error}</p></div>;
 
+  const nextStepLink = questionnairesCompleted ? `/decisione/${rif}` : `/questionario2/${rif}`;
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-5xl bg-white rounded-xl shadow-xl p-8 text-center">
@@ -87,7 +94,7 @@ export default function PlanimetryPage() {
           )}
         </div>
 
-        <Link href={`/questionario2/${rif}`} className="inline-block mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-colors text-lg">
+        <Link href={nextStepLink} className="inline-block mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-colors text-lg">
           Prosegui
         </Link>
       </div>
