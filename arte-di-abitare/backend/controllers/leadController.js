@@ -148,9 +148,71 @@ const updateLeadCallDetails = asyncHandler(async (req, res, next) => {
 });
 
 
-// Deprecated decision functions, logic is now in questionnaire
-const savePropertyDecision = asyncHandler(async (req, res) => res.status(200).json({ message: 'Funzione deprecata.'}));
-const saveZoneDecision = asyncHandler(async (req, res) => res.status(200).json({ message: 'Funzione deprecata.'}));
+const savePropertyDecision = asyncHandler(async (req, res, next) => {
+    const { rif } = req.params;
+    const { choice } = req.body;
+    const userId = req.user._id;
+
+    if (!choice || !['interessato', 'non interessato'].includes(choice)) {
+        res.status(400);
+        throw new Error('Scelta non valida.');
+    }
+
+    const property = await Property.findOne({ rif: rif.toUpperCase() });
+    if (!property) {
+        res.status(404);
+        throw new Error('Immobile non trovato.');
+    }
+
+    const lead = await Lead.findOne({ user: userId, property: property._id });
+    if (!lead) {
+        res.status(404);
+        throw new Error('Lead non trovato per questo utente e immobile.');
+    }
+
+    lead.decisionPropertyInterest = choice;
+    await lead.save();
+
+    logActivity(userId, 'PROPERTY_DECISION', `L'utente ha espresso interesse ('${choice}') per l'immobile RIF: ${rif}`);
+
+    res.status(200).json({ message: 'Decisione salvata con successo.' });
+});
+
+const saveZoneDecision = asyncHandler(async (req, res, next) => {
+    const { rif } = req.params;
+    const { choice } = req.body;
+    const userId = req.user._id;
+
+    if (!choice || !['zona va bene', 'zona non va bene'].includes(choice)) {
+        res.status(400);
+        throw new Error('Scelta non valida.');
+    }
+
+    const property = await Property.findOne({ rif: rif.toUpperCase() });
+    if (!property) {
+        res.status(404);
+        throw new Error('Immobile non trovato.');
+    }
+
+    const lead = await Lead.findOne({ user: userId, property: property._id });
+    if (!lead) {
+        res.status(404);
+        throw new Error('Lead non trovato per questo utente e immobile.');
+    }
+
+    lead.decisionZoneInterest = choice;
+
+    // After this final decision, the lead is considered "Warm" and ready for an agent.
+    if (lead.status === 'Incompleto') {
+        lead.status = 'Da richiamare';
+    }
+
+    await lead.save();
+
+    logActivity(userId, 'ZONE_DECISION', `L'utente ha espresso un'opinione sulla zona ('${choice}') per l'immobile RIF: ${rif}`);
+
+    res.status(200).json({ message: 'Decisione sulla zona salvata con successo.' });
+});
 
 
 module.exports = {
